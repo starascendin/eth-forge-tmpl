@@ -1,0 +1,53 @@
+name: forge-tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
+      - name: Download Foundry installer
+        uses: wei/curl@v1
+        with:
+          args: -L https://foundry.paradigm.xyz -o foundryup_install.sh
+
+      - name: Install Foundryup
+        run: bash foundryup_install.sh
+
+      - name: Install Forge
+        run: bash $HOME/.foundry/bin/foundryup # will run foundryup
+
+      - name: Add Forge to PATH
+        run: echo "$HOME/.foundry/bin" >> $GITHUB_PATH
+
+      - name: Install Yarn
+        run: npm install yarn -g
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Run tests
+        run: yarn test
+
+      - name: Run mock deploy
+        run: yarn void:deploy
+
+      - name: Run static analysis
+        uses: crytic/slither-action@v0.1.0
+        id: slither
+        continue-on-error: true
+        with:
+          sarif: results.sarif
+          ignore-compile: true
+          slither-args: --filter-paths "src/tests/"
+
+      - name: Upload static analysis file
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: ${{ steps.slither.outputs.sarif }}
